@@ -1,5 +1,5 @@
 import os 
-import streamlit as st  
+import streamlit as st
 import pandas as pd  
 import psycopg2  # Biblioteca para conexão com banco de dados PostgreSQL
 
