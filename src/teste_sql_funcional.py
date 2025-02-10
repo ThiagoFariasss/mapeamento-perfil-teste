@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+DATABASE_URL = os.getenv("DATABASE_URL")
 POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST")
@@ -17,6 +18,7 @@ POSTGRES_DB = os.getenv("POSTGRES_DB")
 
 def conectar_banco():
    return psycopg2.connect(
+    psycopg2.connect(DATABASE_URL),
     host=POSTGRES_HOST,
     database=POSTGRES_DB,
     user=POSTGRES_USER,
