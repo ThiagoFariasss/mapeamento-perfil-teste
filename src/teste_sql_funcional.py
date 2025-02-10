@@ -22,7 +22,7 @@ def conectar_banco():
         database=POSTGRES_DB,
         user=POSTGRES_USER,
         password=POSTGRES_PASSWORD,
-        port=int(POSTGRES_PORT)  # Certifique-se de converter para inteiro
+        port=int(POSTGRES_PORT) if POSTGRES_PORT else 5432  # Garante que seja um número
     )
 
 
