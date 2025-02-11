@@ -1,4 +1,4 @@
-import os 
+import os
 import streamlit as st
 import pandas as pd  
 import psycopg2  # Biblioteca para conexão com banco de dados PostgreSQL
@@ -6,7 +6,6 @@ import psycopg2  # Biblioteca para conexão com banco de dados PostgreSQL
 from dotenv import load_dotenv
 
 # Conecta ao banco de dados PostgreSQL
-
 load_dotenv()
 
 POSTGRES_USER = os.getenv("POSTGRES_USER")
@@ -23,7 +22,6 @@ def conectar_banco():
         password=POSTGRES_PASSWORD,
         port=int(POSTGRES_PORT) if POSTGRES_PORT else 5432  # Garante que seja um número
     )
-
 
 # Cria uma tabela de respostas no banco, caso ainda não exista
 def inicializar_banco():
@@ -157,7 +155,6 @@ def main():
         pagina_questionario()
     elif st.session_state["page"] == 3:
         pagina_final()
-
 
 if __name__ == "__main__":
     main()
