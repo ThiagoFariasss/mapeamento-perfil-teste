@@ -2,7 +2,7 @@ import os
 import streamlit as st
 import pandas as pd  
 import psycopg2  # Biblioteca para conexão com banco de dados PostgreSQL
-
+import sqlalchemy
 from dotenv import load_dotenv
 
 # Conecta ao banco de dados PostgreSQL
@@ -13,6 +13,8 @@ POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT")
 POSTGRES_DB = os.getenv("POSTGRES_DB")
+DATABASE_URL = os.getenv("DATABASE_URL")  # String completa de conexão
+
 
 def conectar_banco():
     return psycopg2.connect(
@@ -20,7 +22,7 @@ def conectar_banco():
         database=POSTGRES_DB,
         user=POSTGRES_USER,
         password=POSTGRES_PASSWORD,
-        port=int(POSTGRES_PORT) if POSTGRES_PORT else 5432  # Garante que seja um número
+        port=int(POSTGRES_PORT) if POSTGRES_PORT else 5432
     )
 
 # Cria uma tabela de respostas no banco, caso ainda não exista
@@ -58,7 +60,7 @@ def salvar_respostas(name, email, responses):
 def carregar_respostas():
     """Carrega as respostas do banco de dados"""
     conn = conectar_banco()
-    df = pd.read_sql("SELECT * FROM respostas_questionario", con=conn)  # Lê dados em formato de DataFrame
+    df = pd.read_sql_query("SELECT * FROM respostas_questionario", conn)
     conn.close()
     return df
 
