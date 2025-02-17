@@ -1,162 +1,112 @@
 import os
 import streamlit as st
-import pandas as pd  
-import psycopg2  # Biblioteca para conexão com banco de dados PostgreSQL
-import sqlalchemy
+import pandas as pd
+from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 
-# Conecta ao banco de dados PostgreSQL
+# Carrega variáveis de ambiente
 load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-POSTGRES_USER = os.getenv("POSTGRES_USER")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-POSTGRES_HOST = os.getenv("POSTGRES_HOST")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT")
-POSTGRES_DB = os.getenv("POSTGRES_DB")
-DATABASE_URL = os.getenv("DATABASE_URL")  # String completa de conexão
+# Cria conexão com o banco de dados
+engine = create_engine(DATABASE_URL)
 
-
-def conectar_banco():
-    return psycopg2.connect(
-        host=POSTGRES_HOST or "localhost",
-        database=POSTGRES_DB,
-        user=POSTGRES_USER,
-        password=POSTGRES_PASSWORD,
-        port=int(POSTGRES_PORT) if POSTGRES_PORT else 5432
-    )
-
-# Cria uma tabela de respostas no banco, caso ainda não exista
 def inicializar_banco():
-    conn = conectar_banco()  # Conecta ao banco de dados
-    cursor = conn.cursor()  # Cria um cursor para executar comandos SQL
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS respostas_questionario (
-            id SERIAL PRIMARY KEY,  
-            nome TEXT, 
-            email TEXT, 
-            resposta1 TEXT,  
-            resposta2 TEXT,  
-            resposta3 TEXT   
-        )
-    """)
-    conn.commit()  # Confirma as alterações no banco de dados
-    conn.close()  # Fecha a conexão com o banco de dados
+    """Cria a tabela se não existir"""
+    with engine.connect() as conn:
+        conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS respostas_questionario (
+                id SERIAL PRIMARY KEY,
+                nome TEXT,
+                email TEXT,
+                resposta1 TEXT,
+                resposta2 TEXT,
+                resposta3 TEXT
+            )
+        '''))
+        conn.commit()
 
-# Salvar respostas no banco de dados
 def salvar_respostas(name, email, responses):
-    conn = conectar_banco()
-    cursor = conn.cursor()
+    """Salva as respostas no banco de dados"""
+    with engine.connect() as conn:
+        conn.execute(text('''
+            INSERT INTO respostas_questionario (nome, email, resposta1, resposta2, resposta3)
+            VALUES (:name, :email, :r1, :r2, :r3)
+        '''), {
+            "name": name,
+            "email": email,
+            "r1": responses.get("Resposta 1", ""),
+            "r2": responses.get("Resposta 2", ""),
+            "r3": responses.get("Resposta 3", "")
+        })
+        conn.commit()
 
-    # Insere as respostas no banco
-    cursor.execute("""
-        INSERT INTO respostas_questionario (nome, email, resposta1, resposta2, resposta3)
-        VALUES (%s, %s, %s, %s, %s)
-    """, (name, email, responses.get("Resposta 1", ""), responses.get("Resposta 2", ""), responses.get("Resposta 3", "")))
-
-    conn.commit()
-    conn.close()
-
-# Carrega todas as respostas do banco de dados
 def carregar_respostas():
-    """Carrega as respostas do banco de dados"""
-    conn = conectar_banco()
-    df = pd.read_sql_query("SELECT * FROM respostas_questionario", conn)
-    conn.close()
-    return df
+    """Carrega todas as respostas do banco"""
+    with engine.connect() as conn:
+        return pd.read_sql("SELECT * FROM respostas_questionario", conn)
 
-# Inicializa o estado da sessão no Streamlit
 def inicializa_estado():
-    """Inicializa os valores no estado da sessão"""
-    if "page" not in st.session_state:  # Define página inicial
-        st.session_state["page"] = 1
-    if "name" not in st.session_state:  # Inicializa o nome
-        st.session_state["name"] = ""
-    if "email" not in st.session_state:  # Inicializa o email
-        st.session_state["email"] = ""
-    if "responses" not in st.session_state:  # Inicializa respostas
-        st.session_state["responses"] = {}
+    """Inicializa variáveis no estado da sessão"""
+    for key in ["page", "name", "email", "responses"]:
+        if key not in st.session_state:
+            st.session_state[key] = "" if key in ["name", "email"] else (1 if key == "page" else {})
 
-# Página inicial para identificar o usuário
 def pagina_inicial():
-    """Página inicial para identificação do usuário"""
+    """Página inicial para identificar o usuário"""
     st.title("Questionário")
     st.subheader("Identificação do Usuário")
-
-    name = st.text_input("Digite seu nome:", value=st.session_state["name"])
-    email = st.text_input("Digite seu email:", value=st.session_state["email"])
-
+    
+    name = st.text_input("Nome:", value=st.session_state["name"])
+    email = st.text_input("Email:", value=st.session_state["email"])
+    
     if st.button("Avançar"):
-        if not name or not email:  # Verifica campos vazios
-            st.error("Por favor, preencha todos os campos!")
+        if not name or not email:
+            st.error("Preencha todos os campos!")
         else:
-            st.session_state["name"] = name
-            st.session_state["email"] = email
-
-            # Verifica se já existem respostas para o usuário
+            st.session_state.update({"name": name, "email": email})
             df = carregar_respostas()
-            user_data = df[(df["nome"] == name) & (df["email"] == email)]
-            if not user_data.empty:
-                user_data = user_data.iloc[0]
-                st.session_state["responses"] = {
-                    "Resposta 1": user_data["resposta1"],
-                    "Resposta 2": user_data["resposta2"],
-                    "Resposta 3": user_data["resposta3"]
-                }
-            else:
-                st.session_state["responses"] = {}
+            user_data = df.query("nome == @name and email == @email")
+            
+            st.session_state["responses"] = user_data.iloc[0][["resposta1", "resposta2", "resposta3"]].to_dict() if not user_data.empty else {}
+            st.session_state["page"] = 2
 
-            st.session_state["page"] = 2  # Avança para a próxima página
-
-# Página para responder o questionário
 def pagina_questionario():
     """Página do questionário"""
     st.title("Perguntas")
-    st.subheader("Responda as perguntas abaixo:")
-
-    # Campos para entrada de respostas
-    st.session_state["responses"]["Resposta 1"] = st.text_input(
+    
+    perguntas = [
         "1. Qual é a sua ferramenta favorita para trabalho?",
-        value=st.session_state["responses"].get("Resposta 1", "")
-    )
-    st.session_state["responses"]["Resposta 2"] = st.text_input(
         "2. Qual é o principal desafio que enfrenta no seu trabalho?",
-        value=st.session_state["responses"].get("Resposta 2", "")
-    )
-    st.session_state["responses"]["Resposta 3"] = st.text_input(
-        "3. Como você avalia a eficiência das suas ferramentas atuais?",
-        value=st.session_state["responses"].get("Resposta 3", "")
-    )
-
+        "3. Como você avalia a eficiência das suas ferramentas atuais?"
+    ]
+    
+    for i, pergunta in enumerate(perguntas, 1):
+        chave = f"Resposta {i}"
+        st.session_state["responses"][chave] = st.text_input(pergunta, value=st.session_state["responses"].get(chave, ""))
+    
     if st.button("Enviar"):
-        if any(not answer for answer in st.session_state["responses"].values()):  # Verifica respostas incompletas
-            st.error("Por favor, responda todas as perguntas!")
+        if any(not v for v in st.session_state["responses"].values()):
+            st.error("Responda todas as perguntas!")
         else:
             salvar_respostas(st.session_state["name"], st.session_state["email"], st.session_state["responses"])
-            st.success("Respostas salvas com sucesso!")
-            st.session_state["page"] = 3  # Avança para a página final
+            st.success("Respostas salvas!")
+            st.session_state["page"] = 3
 
-# Página final para agradecimento
 def pagina_final():
-    """Página final com agradecimento"""
+    """Página final de agradecimento"""
     st.title("Obrigado!")
     st.write("Suas respostas foram salvas com sucesso.")
     if st.button("Reiniciar"):
-        st.session_state["page"] = 1
-        st.session_state["responses"] = {}
+        st.session_state.update({"page": 1, "responses": {}})
 
-# Controla o fluxo da aplicação
 def main():
     """Controle do fluxo de páginas"""
-    inicializar_banco()  # Inicializa a tabela no banco
-    inicializa_estado()  # Inicializa o estado da sessão
-
-    # Controle de navegação entre páginas
-    if st.session_state["page"] == 1:
-        pagina_inicial()
-    elif st.session_state["page"] == 2:
-        pagina_questionario()
-    elif st.session_state["page"] == 3:
-        pagina_final()
+    inicializar_banco()
+    inicializa_estado()
+    
+    paginas = {1: pagina_inicial, 2: pagina_questionario, 3: pagina_final}
+    paginas[st.session_state["page"]]()
 
 if __name__ == "__main__":
     main()
