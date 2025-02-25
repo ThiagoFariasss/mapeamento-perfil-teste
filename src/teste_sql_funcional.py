@@ -5,11 +5,18 @@ from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 
 # Carrega variáveis de ambiente
-load_dotenv()
+from dotenv import load_dotenv
+import os
+
+load_dotenv()  # Carrega as variáveis do arquivo .env
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Cria conexão com o banco de dados
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL não foi carregado corretamente.")
+
 engine = create_engine(DATABASE_URL)
+
 
 def inicializar_banco():
     """Cria a tabela se não existir"""
