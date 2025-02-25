@@ -3,14 +3,22 @@ import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
+import os
+
 
 # Carrega variáveis de ambiente
 load_dotenv()  
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+
+
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://mapeamento_perfil_user:MR5z22vyzWnew7MKysSpHdBuPFIYtwVs@dpg-cuj3qk2j1k6c73e1ik40-a.oregon-postgres.render.com:5432/mapeamento_perfil")
+
+print(f"Valor de DATABASE_URL: {DATABASE_URL}")  # Depuração
 
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL não foi carregado corretamente.")
+
 
 engine = create_engine(DATABASE_URL)
 
