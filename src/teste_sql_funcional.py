@@ -5,10 +5,7 @@ from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 
 # Carrega variáveis de ambiente
-from dotenv import load_dotenv
-import os
-
-load_dotenv()  # Carrega as variáveis do arquivo .env
+load_dotenv()  
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -17,10 +14,9 @@ if not DATABASE_URL:
 
 engine = create_engine(DATABASE_URL)
 
-
 def inicializar_banco():
     """Cria a tabela se não existir"""
-    with engine.connect() as conn:
+    with engine.begin() as conn:  # Usa `begin()` para permitir transações
         conn.execute(text('''
             CREATE TABLE IF NOT EXISTS respostas_questionario (
                 id SERIAL PRIMARY KEY,
@@ -31,27 +27,25 @@ def inicializar_banco():
                 resposta3 TEXT
             )
         '''))
-        conn.commit()
 
 def salvar_respostas(name, email, responses):
     """Salva as respostas no banco de dados"""
-    with engine.connect() as conn:
+    with engine.begin() as conn:  # Usa `begin()` para garantir `commit`
         conn.execute(text('''
             INSERT INTO respostas_questionario (nome, email, resposta1, resposta2, resposta3)
             VALUES (:name, :email, :r1, :r2, :r3)
-        '''), {
-            "name": name,
-            "email": email,
-            "r1": responses.get("Resposta 1", ""),
-            "r2": responses.get("Resposta 2", ""),
-            "r3": responses.get("Resposta 3", "")
-        })
-        conn.commit()
+        ''').bindparams(
+            name=name,
+            email=email,
+            r1=responses.get("Resposta 1", ""),
+            r2=responses.get("Resposta 2", ""),
+            r3=responses.get("Resposta 3", "")
+        ))
 
 def carregar_respostas():
     """Carrega todas as respostas do banco"""
     with engine.connect() as conn:
-        return pd.read_sql("SELECT * FROM respostas_questionario", conn)
+        return pd.read_sql("SELECT * FROM respostas_questionario", con=conn)
 
 def inicializa_estado():
     """Inicializa variáveis no estado da sessão"""
@@ -73,9 +67,14 @@ def pagina_inicial():
         else:
             st.session_state.update({"name": name, "email": email})
             df = carregar_respostas()
-            user_data = df.query("nome == @name and email == @email")
             
-            st.session_state["responses"] = user_data.iloc[0][["resposta1", "resposta2", "resposta3"]].to_dict() if not user_data.empty else {}
+            if not df.empty:
+                user_data = df.query("nome == @name and email == @email")
+                if not user_data.empty:
+                    st.session_state["responses"] = user_data.iloc[0][["resposta1", "resposta2", "resposta3"]].to_dict()
+                else:
+                    st.session_state["responses"] = {}
+
             st.session_state["page"] = 2
 
 def pagina_questionario():
@@ -88,15 +87,19 @@ def pagina_questionario():
         "3. Como você avalia a eficiência das suas ferramentas atuais?"
     ]
     
+    respostas = st.session_state.get("responses", {})
+    
     for i, pergunta in enumerate(perguntas, 1):
         chave = f"Resposta {i}"
-        st.session_state["responses"][chave] = st.text_input(pergunta, value=st.session_state["responses"].get(chave, ""))
+        respostas[chave] = st.text_input(pergunta, value=respostas.get(chave, ""))
     
+    st.session_state["responses"] = respostas
+
     if st.button("Enviar"):
-        if any(not v for v in st.session_state["responses"].values()):
+        if any(not v for v in respostas.values()):
             st.error("Responda todas as perguntas!")
         else:
-            salvar_respostas(st.session_state["name"], st.session_state["email"], st.session_state["responses"])
+            salvar_respostas(st.session_state["name"], st.session_state["email"], respostas)
             st.success("Respostas salvas!")
             st.session_state["page"] = 3
 
