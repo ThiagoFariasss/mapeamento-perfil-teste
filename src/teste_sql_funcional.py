@@ -9,8 +9,14 @@ import os
 # Carrega variáveis de ambiente
 load_dotenv()  
 
+import os
+import streamlit as st
 
+# Obtém a porta a partir da variável de ambiente PORT
+port = int(os.environ.get("PORT",8501))
 
+# Inicia o Streamlit na porta especificada
+st.run(port=port, address="0.0.0.0")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://mapeamento_perfil_user:MR5z22vyzWnew7MKysSpHdBuPFIYtwVs@dpg-cuj3qk2j1k6c73e1ik40-a.oregon-postgres.render.com:5432/mapeamento_perfil")
 
