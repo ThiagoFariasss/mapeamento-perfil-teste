@@ -3,34 +3,21 @@ import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
-import os
-
 
 # Carrega variáveis de ambiente
-load_dotenv()  
+load_dotenv()
 
-import os
-import streamlit as st
-
-# Obtém a porta a partir da variável de ambiente PORT
-port = int(os.environ.get("PORT",8501))
-
-# Inicia o Streamlit na porta especificada
-st.run(port=port, address="0.0.0.0")
-
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://mapeamento_perfil_user:MR5z22vyzWnew7MKysSpHdBuPFIYtwVs@dpg-cuj3qk2j1k6c73e1ik40-a.oregon-postgres.render.com:5432/mapeamento_perfil")
-
-print(f"Valor de DATABASE_URL: {DATABASE_URL}")  # Depuração
-
-if not DATABASE_URL:
+# Obtém a URL do banco de dados
+database_url = os.getenv("DATABASE_URL")
+if not database_url:
     raise ValueError("DATABASE_URL não foi carregado corretamente.")
 
-
-engine = create_engine(DATABASE_URL)
+# Configura o banco de dados
+engine = create_engine(database_url)
 
 def inicializar_banco():
-    """Cria a tabela se não existir"""
-    with engine.begin() as conn:  # Usa `begin()` para permitir transações
+    """Cria a tabela se não existir."""
+    with engine.begin() as conn:
         conn.execute(text('''
             CREATE TABLE IF NOT EXISTS respostas_questionario (
                 id SERIAL PRIMARY KEY,
@@ -43,32 +30,32 @@ def inicializar_banco():
         '''))
 
 def salvar_respostas(name, email, responses):
-    """Salva as respostas no banco de dados"""
-    with engine.begin() as conn:  # Usa `begin()` para garantir `commit`
+    """Salva as respostas no banco de dados."""
+    with engine.begin() as conn:
         conn.execute(text('''
             INSERT INTO respostas_questionario (nome, email, resposta1, resposta2, resposta3)
             VALUES (:name, :email, :r1, :r2, :r3)
-        ''').bindparams(
-            name=name,
-            email=email,
-            r1=responses.get("Resposta 1", ""),
-            r2=responses.get("Resposta 2", ""),
-            r3=responses.get("Resposta 3", "")
-        ))
+        '''), {
+            "name": name,
+            "email": email,
+            "r1": responses.get("Resposta 1", ""),
+            "r2": responses.get("Resposta 2", ""),
+            "r3": responses.get("Resposta 3", ""),
+        })
 
 def carregar_respostas():
-    """Carrega todas as respostas do banco"""
+    """Carrega todas as respostas do banco."""
     with engine.connect() as conn:
         return pd.read_sql("SELECT * FROM respostas_questionario", con=conn)
 
 def inicializa_estado():
-    """Inicializa variáveis no estado da sessão"""
+    """Inicializa variáveis no estado da sessão."""
     for key in ["page", "name", "email", "responses"]:
         if key not in st.session_state:
             st.session_state[key] = "" if key in ["name", "email"] else (1 if key == "page" else {})
 
 def pagina_inicial():
-    """Página inicial para identificar o usuário"""
+    """Página inicial para identificação do usuário."""
     st.title("Questionário")
     st.subheader("Identificação do Usuário")
     
@@ -92,7 +79,7 @@ def pagina_inicial():
             st.session_state["page"] = 2
 
 def pagina_questionario():
-    """Página do questionário"""
+    """Página do questionário."""
     st.title("Perguntas")
     
     perguntas = [
@@ -118,14 +105,14 @@ def pagina_questionario():
             st.session_state["page"] = 3
 
 def pagina_final():
-    """Página final de agradecimento"""
+    """Página final de agradecimento."""
     st.title("Obrigado!")
     st.write("Suas respostas foram salvas com sucesso.")
     if st.button("Reiniciar"):
         st.session_state.update({"page": 1, "responses": {}})
 
 def main():
-    """Controle do fluxo de páginas"""
+    """Controle do fluxo de páginas."""
     inicializar_banco()
     inicializa_estado()
     
