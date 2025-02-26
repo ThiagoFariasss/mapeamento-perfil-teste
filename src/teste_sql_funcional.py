@@ -1,3 +1,4 @@
+
 import os
 import streamlit as st
 import pandas as pd
@@ -6,6 +7,8 @@ from dotenv import load_dotenv
 
 # Carrega variáveis de ambiente
 load_dotenv()
+
+
 
 # Obtém a URL do banco de dados
 database_url = os.getenv("DATABASE_URL")
@@ -121,3 +124,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# %%
